@@ -5,6 +5,8 @@ name: Clima
 on:
   # En cada push a cualquier rama
   push:
+    # Solo en main (las ramas con PR ya se prueban con pull_request)
+    branches: [main]
   # En cada pull request
   pull_request:
   # Todos los días a las 9 AM de Buenos Aires
@@ -36,7 +38,7 @@ jobs:
           cache: pip
       # Instala las dependencias (requests, truststore, pytest)
       - name: Instalar dependencias
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
       # Ejecuta los tests
       - name: Correr pytest
         run: pytest
@@ -48,6 +50,10 @@ jobs:
     # Solo en la ejecución programada (o manual), nunca en push ni en PR
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Evita que dos ejecuciones simultáneas se pisen al hacer push
+    concurrency:
+      group: clima-csv
+      cancel-in-progress: false
     # Este job necesita permiso de escritura para poder hacer commit
     permissions:
       contents: write
@@ -78,5 +84,6 @@ jobs:
           git diff --cached --quiet && exit 0
           # Crea el commit con la fecha de hoy en el mensaje
           git commit -m "Actualiza clima.csv ($(date -u +%F))"
-          # Sube el commit a la rama actual
+          # Incorpora commits nuevos de la rama (si los hay) y sube el commit
+          git pull --rebase
           git push
