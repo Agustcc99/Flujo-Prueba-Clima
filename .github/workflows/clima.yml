@@ -1,0 +1,83 @@
+# Nombre del workflow que se ve en la pestaña "Actions" de GitHub
+name: Clima
+
+# Cuándo se dispara el workflow
+on:
+  # En cada push a cualquier rama
+  push:
+  # En cada pull request
+  pull_request:
+  # Todos los días a las 9 AM de Buenos Aires
+  schedule:
+    # Buenos Aires es UTC-3 todo el año (sin horario de verano),
+    # así que 9:00 ART = 12:00 UTC -> minuto 0, hora 12, todos los días
+    - cron: "0 12 * * *"
+  # Permite ejecutarlo a mano desde la pestaña "Actions"
+  workflow_dispatch:
+
+# Permisos del GITHUB_TOKEN: solo lectura por defecto
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: correr los tests
+  tests:
+    # Máquina virtual donde corre el job
+    runs-on: ubuntu-latest
+    steps:
+      # Descarga el código del repositorio
+      - uses: actions/checkout@v4
+      # Instala Python
+      - uses: actions/setup-python@v5
+        with:
+          # Versión de Python a usar
+          python-version: "3.12"
+          # Guarda en caché las dependencias de pip para acelerar
+          cache: pip
+      # Instala las dependencias (requests, truststore, pytest)
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      # Ejecuta los tests
+      - name: Correr pytest
+        run: pytest
+
+  # Job 2: obtener el clima y guardar el CSV en el repo
+  clima:
+    # Solo corre si pasaron los tests
+    needs: tests
+    # Solo en la ejecución programada (o manual), nunca en push ni en PR
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Este job necesita permiso de escritura para poder hacer commit
+    permissions:
+      contents: write
+    steps:
+      # Descarga el código del repositorio
+      - uses: actions/checkout@v4
+      # Instala Python
+      - uses: actions/setup-python@v5
+        with:
+          # Versión de Python a usar
+          python-version: "3.12"
+          # Guarda en caché las dependencias de pip
+          cache: pip
+      # Instala las dependencias
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      # Ejecuta el script que agrega una fila nueva a clima.csv
+      - name: Ejecutar clima.py
+        run: python clima.py
+      # Sube el CSV actualizado al repositorio
+      - name: Commitear clima.csv
+        run: |
+          # Identidad con la que se firma el commit (el bot de Actions)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # clima.csv está en .gitignore, por eso hace falta -f para agregarlo
+          git add -f clima.csv
+          # Si no hay cambios, termina sin error (evita commits vacíos)
+          git diff --cached --quiet && exit 0
+          # Crea el commit con la fecha de hoy en el mensaje
+          git commit -m "Actualiza clima.csv ($(date -u +%F))"
+          # Sube el commit a la rama actual
+          git push
