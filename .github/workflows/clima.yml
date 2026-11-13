@@ -73,8 +73,7 @@ jobs:
           # Identidad con la que se firma el commit (el bot de Actions)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # clima.csv está en .gitignore, por eso hace falta -f para agregarlo
-          git add -f clima.csv
+          git add clima.csv
           # Si no hay cambios, termina sin error (evita commits vacíos)
           git diff --cached --quiet && exit 0
           # Crea el commit con la fecha de hoy en el mensaje
